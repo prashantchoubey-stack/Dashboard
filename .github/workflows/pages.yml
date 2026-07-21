@@ -28,8 +28,11 @@ jobs:
           enablement: true
       - name: Stage dashboard-only artifact
         run: |
-          mkdir _site
-          cp index.html _site/\n          mkdir -p _site/assets\n          cp assets/cocc.css assets/cocc.js _site/assets/
+          rm -rf _site
+          mkdir -p _site/assets
+          cp index.html _site/
+          cp assets/cocc.css _site/assets/
+          cp assets/cocc.js _site/assets/
       - name: Upload dashboard
         uses: actions/upload-pages-artifact@v3
         with:
