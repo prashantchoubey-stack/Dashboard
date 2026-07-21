@@ -29,7 +29,7 @@ jobs:
       - name: Stage dashboard-only artifact
         run: |
           mkdir _site
-          cp index.html dashboard.css dashboard.js _site/
+          cp index.html _site/\n          mkdir -p _site/assets\n          cp assets/cocc.css assets/cocc.js _site/assets/
       - name: Upload dashboard
         uses: actions/upload-pages-artifact@v3
         with:
