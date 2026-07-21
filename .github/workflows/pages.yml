@@ -33,6 +33,7 @@ jobs:
           cp index.html _site/
           cp assets/cocc.css _site/assets/
           cp assets/cocc.js _site/assets/
+          cp assets/live-config.js _site/assets/
       - name: Upload dashboard
         uses: actions/upload-pages-artifact@v3
         with:
