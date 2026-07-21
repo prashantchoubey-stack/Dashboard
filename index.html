@@ -1,102 +1,14 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Executive view of the Content Repository portfolio, readiness and data quality.">
-  <title>Content Intelligence Command Center</title>
-  <link rel="stylesheet" href="./dashboard.css">
-</head>
-<body>
-<main>
-  <header class="topbar">
-    <div class="brand"><span class="brand-mark">CI</span><div><strong>Content Intelligence</strong><small>Executive command center</small></div></div>
-    <nav aria-label="Dashboard views">
-      <button class="active" data-view="portfolio">Portfolio</button>
-      <button data-view="quality">Data quality</button>
-      <button data-view="podb">POD B</button>
-    </nav>
-    <div class="header-actions">
-      <span class="source source-checking" id="source"><i></i><span>Checking source</span></span>
-      <button class="icon-button" id="refresh" title="Refresh dashboard" aria-label="Refresh dashboard">↻</button>
-      <a class="primary-link" href="https://datastudio.google.com/reporting/b863a821-39aa-4bb6-8c76-f071f676d0e6" target="_blank" rel="noreferrer">Open drill-down <span>↗</span></a>
-    </div>
-  </header>
-
-  <section class="page-heading">
-    <div><p class="eyebrow">CONTENT REPOSITORY · <span data-field="asOf">AS OF 12 JUL 2026</span></p><h1 id="view-title">Portfolio at a glance</h1><p id="view-subtitle">One view of scale, readiness, language coverage and portfolio risk.</p></div>
-    <div class="heading-stat"><small>Portfolio readiness</small><strong data-field="readiness">99.87%</strong><div><span id="readiness-bar"></span></div></div>
-  </section>
-
-  <div class="view active" id="portfolio">
-    <section class="kpi-grid">
-      <article class="kpi kpi-blue"><div class="kpi-top"><span class="kpi-dot"></span><span>Product-ready portfolio</span></div><strong data-number="productReady">324,787</strong><small>approved reporting scope</small></article>
-      <article class="kpi kpi-cyan"><div class="kpi-top"><span class="kpi-dot"></span><span>PAL records</span></div><strong data-number="pal">301,819</strong><small>92.9% of ready portfolio</small></article>
-      <article class="kpi kpi-amber"><div class="kpi-top"><span class="kpi-dot"></span><span>LEP records</span></div><strong data-number="lep">5,288</strong><small>non-PAL library</small></article>
-      <article class="kpi kpi-green"><div class="kpi-top"><span class="kpi-dot"></span><span>WP / WA Assessment</span></div><strong data-number="wp">17,657</strong><small>shared assessment bank</small></article>
-      <article class="kpi kpi-purple"><div class="kpi-top"><span class="kpi-dot"></span><span>Unity final playable</span></div><strong data-number="unityFinal">23</strong><small>from 438 inventory items</small></article>
-      <article class="kpi kpi-red"><div class="kpi-top"><span class="kpi-dot"></span><span>Unknown medium</span></div><strong data-number="unknownMedium">3,015</strong><small><span data-field="classifiedShare">99.1%</span> language classified</small></article>
-    </section>
-
-    <section class="dashboard-grid">
-      <article class="panel composition-panel">
-        <div class="panel-title"><div><p class="eyebrow">PORTFOLIO MIX</p><h2>Where the repository sits today</h2></div><span class="panel-total"><span data-number="productReady">324,787</span> ready</span></div>
-        <div class="bars">
-          <div class="bar-row"><div class="bar-label"><span>PAL library</span><strong data-number="pal">301,819</strong></div><div class="bar-track"><span id="bar-pal" class="fill-blue"></span></div><small>92.9% of ready portfolio</small></div>
-          <div class="bar-row"><div class="bar-label"><span>WP / WA Assessment</span><strong data-number="wp">17,657</strong></div><div class="bar-track"><span id="bar-wp" class="fill-green"></span></div><small>question bank</small></div>
-          <div class="bar-row"><div class="bar-label"><span>LEP / Non-PAL</span><strong data-number="lep">5,288</strong></div><div class="bar-track"><span id="bar-lep" class="fill-amber"></span></div><small>supplementary library</small></div>
-          <div class="bar-row"><div class="bar-label"><span>Unity final playable</span><strong data-number="unityFinal">23</strong></div><div class="bar-track"><span id="bar-unity" class="fill-purple"></span></div><small>438 historical inventory items reviewed</small></div>
-        </div>
-        <div class="bridge"><div><small>Product-ready</small><strong data-number="productReady">324,787</strong></div><span class="bridge-line"><i id="bridge-bar"></i></span><div class="align-right"><small>Historical total</small><strong data-number="historical">325,202</strong></div></div>
-      </article>
-
-      <article class="panel language-panel">
-        <div class="panel-title"><div><p class="eyebrow">LANGUAGE COVERAGE</p><h2>English leads the library</h2></div></div>
-        <div class="donut-wrap"><div class="donut" id="language-donut"><span><strong data-field="englishShare">76.39%</strong><small>English</small></span></div><div class="legend"><div><i class="blue"></i><span>English</span><strong data-field="englishShare">76.39%</strong></div><div><i class="green"></i><span>Regional & multilingual</span><strong data-field="regionalShare">22.68%</strong></div><div><i class="grey"></i><span>Unknown medium</span><strong data-number="unknownMedium">3,015</strong></div></div></div>
-        <p class="callout">Language coverage is strong, but <strong data-number="unknownMedium">3,015</strong> records still need a medium classification.</p>
-      </article>
-
-      <article class="panel insight-panel">
-        <div class="panel-title"><div><p class="eyebrow">EXECUTIVE READOUT</p><h2>Three decisions matter now</h2></div></div>
-        <ol class="insight-list">
-          <li><span class="rank rank-blue">01</span><div><strong>Close the reconciliation gap</strong><p><span data-number="gap">415</span> records separate the historical total from the product-ready scope.</p></div></li>
-          <li><span class="rank rank-red">02</span><div><strong>Resolve language unknowns</strong><p><span data-number="unknownMedium">3,015</span> records limit confidence in regional-language reporting.</p></div></li>
-          <li><span class="rank rank-purple">03</span><div><strong>Move POD B to final</strong><p><span data-number="podBLinks">77</span> links are tracked, but no integrated final asset is approved yet.</p></div></li>
-        </ol>
-      </article>
-
-      <article class="panel health-panel">
-        <div class="panel-title"><div><p class="eyebrow">REPOSITORY HEALTH</p><h2>Status by workstream</h2></div></div>
-        <div class="health-table"><div><span>PAL library</span><span class="status status-good">Ready</span><strong data-number="pal">301,819</strong></div><div><span>WP / WA Assessment</span><span class="status status-good">Ready</span><strong data-number="wp">17,657</strong></div><div><span>Unity assets</span><span class="status status-watch">Validated subset</span><strong data-number="unityFinal">23</strong></div><div><span>POD B repository</span><span class="status status-risk">Needs validation</span><strong data-number="podBValidation">77</strong></div></div>
-      </article>
-    </section>
-  </div>
-
-  <div class="view" id="quality">
-    <section class="quality-layout">
-      <article class="quality-hero"><div><p class="eyebrow">TRUST SCORE</p><strong data-field="classifiedShare">99.1%</strong><h2>of the portfolio has a known language classification</h2><p>Good enough for directional CXO reporting; the unknown tail must be cleared before regional-language planning.</p></div><div class="quality-ring" id="quality-ring"><span><b data-number="unknownMedium">3,015</b><small>unknown</small></span></div></article>
-      <div class="issue-grid">
-        <article class="issue"><span>01</span><div><span class="status status-risk">High priority</span><h3>Medium classification</h3><p><span data-number="unknownMedium">3,015</span> rows need a normalized language value.</p><small>Owner: Content operations</small></div></article>
-        <article class="issue"><span>02</span><div><span class="status status-watch">Review</span><h3>Unity eligibility</h3><p><span data-number="unityFinal">23</span> final playable assets from <span data-number="unityInventory">438</span> indexed items.</p><small>Rule: finished playable output only</small></div></article>
-        <article class="issue"><span>03</span><div><span class="status status-watch">Review</span><h3>Historical reconciliation</h3><p><span data-number="gap">415</span> records remain outside the approved ready scope.</p><small>Keep Grade 9 & 10 rollups excluded</small></div></article>
-        <article class="issue"><span>04</span><div><span class="status status-neutral">Mapping</span><h3>Partner classification</h3><p>Separate ConveGenius internal projects from external partners.</p><small>Owner confirmation pending</small></div></article>
-      </div>
-      <article class="panel action-plan"><div class="panel-title"><div><p class="eyebrow">90-DAY CONTROL PLAN</p><h2>From inventory to trusted intelligence</h2></div></div><div class="timeline"><div><span>1</span><strong>Normalize</strong><p>Medium, partner and project fields</p></div><div><span>2</span><strong>Validate</strong><p>Unity and POD B final-output rules</p></div><div><span>3</span><strong>Automate</strong><p>Live KPI refresh and exception alerts</p></div><div><span>4</span><strong>Scale</strong><p>Add new repositories through registry</p></div></div></article>
-    </section>
-  </div>
-
-  <div class="view" id="podb">
-    <section class="podb-layout">
-      <div class="podb-kpis"><article class="kpi kpi-blue"><div class="kpi-top"><span class="kpi-dot"></span><span>Stories tracked</span></div><strong data-number="podBStories">25</strong><small>interactive learning stories</small></article><article class="kpi kpi-cyan"><div class="kpi-top"><span class="kpi-dot"></span><span>Asset links</span></div><strong data-number="podBLinks">77</strong><small>across production platforms</small></article><article class="kpi kpi-amber"><div class="kpi-top"><span class="kpi-dot"></span><span>Needs validation</span></div><strong data-number="podBValidation">77</strong><small>final/draft status pending</small></article><article class="kpi kpi-red"><div class="kpi-top"><span class="kpi-dot"></span><span>Final integrated</span></div><strong data-number="podBFinal">0</strong><small>approved production output</small></article></div>
-      <section class="podb-grid">
-        <article class="panel pipeline-panel"><div class="panel-title"><div><p class="eyebrow">PRODUCTION PIPELINE</p><h2>Asset availability is ahead of approval</h2></div></div><div class="pipeline"><div><span>1</span><strong>Storyboard / LBD</strong><b>10 available</b></div><div><span>2</span><strong>Canva design</strong><b>10 available</b></div><div><span>3</span><strong>Figma design</strong><b>10 available</b></div><div><span>4</span><strong>Game link</strong><b>10 available</b></div></div><div class="pipeline-final"><span>→</span><div><small>FINAL INTEGRATED OUTPUT</small><strong data-number="podBFinal">0</strong><p>Approval and final-link validation are the current bottleneck.</p></div></div></article>
-        <article class="panel podb-risk"><div class="panel-title"><div><p class="eyebrow">READINESS GAP</p><h2>What prevents release</h2></div></div><div class="big-risk"><strong data-number="podBMissing">29</strong><span>missing asset slots</span></div><div class="risk-bars"><div><span>Links needing validation</span><strong data-number="podBValidation">77</strong></div><div><span>Final integrated games</span><strong data-number="podBFinal">0</strong></div></div><p class="callout warning">Count only finished playable assets. Storyboards, Figma, Canva and planning sheets remain production evidence, not final outputs.</p></article>
-      </section>
-    </section>
-  </div>
-
-  <footer><span>Approved KPI scope · Content Repository</span><span>Operational detail remains available in Looker Studio</span></footer>
-</main>
-<script src="./dashboard.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Content Operations Command Center — count intelligence and product drill-down dashboard." />
+    <title>Content Operations Command Center</title>
+    <script type="module" crossorigin src="../assets/static-index-rWZK71Hw.js"></script>
+    <link rel="stylesheet" crossorigin href="../assets/static-index-D_hTU-TM.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
 </html>
