@@ -18,5 +18,5 @@ Follow `apps-script/README.md` to deploy the Apps Script web app. Then place the
 1. Open the `/exec` URL and confirm the response has `success: true`.
 2. Confirm the response contains only `Dataset`, `Dimension`, `Label`, `Value`, `Status`, and `Updated_On`.
 3. Open the public dashboard and use **Live data synced** to refresh.
-4. Confirm PAL is `44,818`, portfolio is `67,786`, WP / WA is `17,657`, and Unity is `23`.
+4. Confirm PAL is `44,818`, portfolio is `63,787`, LEP is `1,228`, WP / WA is `17,657`, and Unity is `84`.
 5. Change one approved, non-total test value in `GitHub_Live_Data`, refresh the dashboard, confirm the change appears, and then restore the approved value.
