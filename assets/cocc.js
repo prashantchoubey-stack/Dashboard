@@ -1,5 +1,7 @@
 const palette = ["#5b5ce2", "#13a8a8", "#f59e0b", "#e95d78", "#7c3aed", "#3b82f6", "#10b981", "#f97316", "#64748b", "#a855f7", "#0ea5e9"];
 const number = new Intl.NumberFormat("en-IN");
+const LIVE_CACHE_KEY = "cocc-approved-live-data-v1";
+const LIVE_REQUEST_TIMEOUT_MS = 12000;
 
 const approvedSnapshot = {
   portfolioTotal: 67786,
@@ -99,6 +101,25 @@ const state = {
   error: "",
 };
 
+function readLastValidData() {
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(LIVE_CACHE_KEY) || "null");
+    if (!cached || typeof cached !== "object" || !cached.data) return null;
+    if (!Number.isFinite(Number(cached.data.portfolioTotal)) || !Array.isArray(cached.data.products)) return null;
+    return cached.data;
+  } catch {
+    return null;
+  }
+}
+
+function storeLastValidData(data) {
+  try {
+    window.localStorage.setItem(LIVE_CACHE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data }));
+  } catch {
+    // Storage can be unavailable in private browsing; the in-memory data remains valid.
+  }
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
 }
@@ -195,7 +216,10 @@ function render() {
   const coverage = product.count ? Math.round((represented / product.count) * 100) : 0;
   const largest = sorted[0] || { label: "No approved data", value: 0 };
   const live = state.source === "live";
-  const fallback = state.source === "snapshot";
+  const fallback = state.source === "snapshot" || state.source === "cached";
+  const sourceLabel = live ? "Live endpoint" : state.source === "cached" ? "Last valid live data" : "Approved snapshot";
+  const refreshLabel = state.source === "checking" ? "● Refreshing live data" : live ? "● Live data synced" : state.source === "cached" ? "● Last valid data" : "● Approved fallback";
+  const fallbackMessage = state.source === "cached" ? "The endpoint could not be reached. The last successfully validated live data remains visible." : "The endpoint is not available yet. Showing the approved published snapshot.";
 
   root.innerHTML = `
     <main class="shell">
@@ -207,14 +231,14 @@ function render() {
           <button class="navItem">✓ <span>Validation</span></button>
           <button class="navItem">↗ <span>Delivery</span></button>
         </nav>
-        <div class="sideStatus"><span class="pulse"></span><div><strong>Controlled view</strong><small>${live ? "Live endpoint" : "Last published snapshot"} · ${escapeHtml(state.data.updatedOn)}</small></div></div>
+        <div class="sideStatus"><span class="pulse"></span><div><strong>Controlled view</strong><small>${sourceLabel} · ${escapeHtml(state.data.updatedOn)}</small></div></div>
       </aside>
       <section class="workspace">
         <header class="topbar">
           <div><p class="eyebrow">CONTENT REPOSITORY</p><h1>Count Intelligence Studio</h1><p>Approved executive metrics and controlled product breakdowns</p></div>
-          <button id="refresh-live" class="auditTag" style="cursor:pointer">${state.source === "checking" ? "● Checking live data" : live ? "● Live data synced" : "● Approved fallback"}</button>
+          <button id="refresh-live" class="auditTag" style="cursor:pointer" ${state.source === "checking" ? "disabled" : ""}>${refreshLabel}</button>
         </header>
-        ${fallback ? `<section class="panel" style="margin:0 0 14px;border-left:3px solid #f59e0b;padding:12px 14px"><strong style="font-size:12px">Live data unavailable</strong><span style="display:block;margin-top:3px;color:#725d31;font-size:11px">Showing last published snapshot.</span></section>` : ""}
+        ${fallback ? `<section class="panel" role="status" style="margin:0 0 14px;border-left:3px solid #f59e0b;padding:12px 14px"><strong style="font-size:12px">Live data temporarily unavailable</strong><span style="display:block;margin-top:3px;color:#725d31;font-size:11px">${fallbackMessage}</span></section>` : ""}
         <section class="portfolioStrip">
           <div class="portfolioTotal"><span>PRODUCT-READY PORTFOLIO</span><strong>${number.format(state.data.portfolioTotal)}</strong><small>approved reporting total</small></div>
           <div class="mixBar" aria-label="Portfolio composition">${products.filter((item) => item.count > 0).map((item, index) => `<button data-product="${item.id}" style="width:${(item.count / state.data.portfolioTotal) * 100}%;background:${palette[index % palette.length]}" title="${escapeHtml(item.name)}: ${number.format(item.count)}"></button>`).join("")}</div>
@@ -266,22 +290,30 @@ async function refresh() {
   render();
   const endpoint = String(window.COC_LIVE_DATA_URL || "").trim();
   if (!endpoint) {
-    state.data = structuredClone(approvedSnapshot);
-    state.source = "snapshot";
+    const cached = readLastValidData();
+    state.data = cached || state.data || structuredClone(approvedSnapshot);
+    state.source = cached ? "cached" : "snapshot";
     state.error = "Live-data endpoint is not configured";
     render();
     return;
   }
 
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), LIVE_REQUEST_TIMEOUT_MS);
   try {
-    const response = await fetch(endpoint, { cache: "no-store" });
+    const response = await fetch(endpoint, { cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error(`Live-data HTTP ${response.status}`);
-    state.data = applyApprovedRows(await response.json());
+    const nextData = applyApprovedRows(await response.json());
+    state.data = nextData;
+    storeLastValidData(nextData);
     state.source = "live";
   } catch (error) {
-    state.data = structuredClone(approvedSnapshot);
-    state.source = "snapshot";
+    const cached = readLastValidData();
+    state.data = cached || state.data || structuredClone(approvedSnapshot);
+    state.source = cached ? "cached" : "snapshot";
     state.error = error instanceof Error ? error.message : "Live data unavailable";
+  } finally {
+    window.clearTimeout(timeout);
   }
   render();
 }

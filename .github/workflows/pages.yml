@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   deploy:
+    timeout-minutes: 10
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -27,13 +28,20 @@ jobs:
         with:
           enablement: true
       - name: Stage dashboard-only artifact
+        shell: bash
         run: |
+          set -euo pipefail
           rm -rf _site
           mkdir -p _site/assets
           cp index.html _site/
           cp assets/cocc.css _site/assets/
           cp assets/cocc.js _site/assets/
           cp assets/live-config.js _site/assets/
+          touch _site/.nojekyll
+          test -s _site/index.html
+          test -s _site/assets/cocc.css
+          test -s _site/assets/cocc.js
+          test -s _site/assets/live-config.js
       - name: Upload dashboard
         uses: actions/upload-pages-artifact@v3
         with:
