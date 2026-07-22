@@ -4,8 +4,8 @@ const LIVE_CACHE_KEY = "cocc-approved-live-data-v1";
 const LIVE_REQUEST_TIMEOUT_MS = 12000;
 
 const approvedSnapshot = {
-  portfolioTotal: 67786,
-  updatedOn: "21 Jul 2026",
+  portfolioTotal: 63787,
+  updatedOn: "22 Jul 2026",
   products: [
     {
       id: "pal",
@@ -63,11 +63,15 @@ const approvedSnapshot = {
       },
     },
     {
-      id: "lep", dataset: "LEP", name: "LEP", short: "LEP", count: 5288,
-      status: "Approved separate KPI", owner: "Content Operations",
-      basis: "LEP remains a separate approved project KPI and is not merged into PAL.",
-      insight: "5,288 approved LEP content records are included in the executive portfolio.",
-      dimensions: { KPI: [{ label: "Approved LEP content", value: 5288 }] },
+      id: "lep", dataset: "LEP", name: "LEP", short: "LEP", count: 1228,
+      status: "Approved delivered resources", owner: "Content Operations",
+      basis: "Delivered Teacher Handbook and Student Workbook resources are counted across English, Hindi, Maths and Science.",
+      insight: "1,228 delivered LEP resources are included in the executive portfolio.",
+      dimensions: {
+        Subject: [{ label: "English", value: 448 }, { label: "Maths", value: 320 }, { label: "Hindi", value: 280 }, { label: "Science", value: 180 }],
+        "Resource type": [{ label: "Student Workbook resources", value: 681 }, { label: "Teacher Handbook resources", value: 547 }],
+        Grade: [{ label: "Grade 6", value: 196 }, { label: "Grade 7", value: 207 }, { label: "Grade 8", value: 200 }, { label: "Grade 9", value: 205 }, { label: "Grade 10", value: 212 }, { label: "Grade 11", value: 104 }, { label: "Grade 12", value: 104 }],
+      },
     },
     {
       id: "weekly", dataset: "WP/WA", name: "WP / WA Assessment", short: "WP/WA", count: 17657,
@@ -77,11 +81,14 @@ const approvedSnapshot = {
       dimensions: { KPI: [{ label: "Approved questions", value: 17657 }] },
     },
     {
-      id: "unity", dataset: "Unity", name: "Unity Simulations", short: "Unity", count: 23,
-      status: "Approved final playable", owner: "Content Operations",
-      basis: "Only unique, quality-approved playable simulations are counted as final products.",
-      insight: "23 approved playable simulations are included in the executive portfolio.",
-      dimensions: { KPI: [{ label: "Final playable", value: 23 }] },
+      id: "unity", dataset: "Unity", name: "Unity Simulations", short: "Unity", count: 84,
+      status: "Approved GitHub-available", owner: "Content Operations",
+      basis: "Unique simulation codes marked Available on Github = Yes are counted once; language-specific duplicate rows do not increase the total.",
+      insight: "84 unique GitHub-available simulations are included in the executive portfolio.",
+      dimensions: {
+        Grade: [{ label: "Grade 6", value: 16 }, { label: "Grade 7", value: 15 }, { label: "Grade 8", value: 17 }, { label: "Grade 9", value: 14 }, { label: "Grade 10", value: 22 }],
+        Language: [{ label: "Gujarati", value: 76 }, { label: "English", value: 76 }, { label: "Hindi", value: 5 }, { label: "Marathi", value: 5 }, { label: "Odia", value: 2 }, { label: "Telugu", value: 2 }, { label: "Unspecified", value: 8 }],
+      },
     },
     {
       id: "podb", dataset: "POD B", name: "POD B", short: "POD B", count: 0,
@@ -141,9 +148,9 @@ function liveValue(rows, dataset, dimension, label) {
   return Number.isFinite(value) ? value : null;
 }
 
-function liveDimension(rows, dimension) {
+function liveDimension(rows, dataset, dimension) {
   const items = rows
-    .filter((row) => row.Dataset === "PAL" && row.Dimension === dimension && Number.isFinite(Number(row.Value)) && Number(row.Value) >= 0)
+    .filter((row) => row.Dataset === dataset && row.Dimension === dimension && Number.isFinite(Number(row.Value)) && Number(row.Value) >= 0)
     .map((row) => ({ label: String(row.Label), value: Number(row.Value) }));
 
   if (dimension !== "Provider/Project" || items.length <= 15) return items;
@@ -178,13 +185,30 @@ function applyApprovedRows(payload) {
     "Provider / Project": "Provider/Project",
   };
   Object.entries(dimensionMap).forEach(([displayName, sourceName]) => {
-    const items = liveDimension(rows, sourceName);
+    const items = liveDimension(rows, "PAL", sourceName);
     if (pal && items.length) pal.dimensions[displayName] = items;
   });
   if (pal) {
     pal.status = "Approved child-facing · live";
     pal.insight = `${number.format(pal.count)} approved child-facing items are included in the live executive reporting layer.`;
   }
+
+  const liveDimensionSets = {
+    lep: { Subject: "Subject", "Resource type": "Content Type", Grade: "Grade" },
+    unity: { Grade: "Grade", Language: "Medium" },
+  };
+  Object.entries(liveDimensionSets).forEach(([id, dimensions]) => {
+    const target = next.products.find((item) => item.id === id);
+    Object.entries(dimensions).forEach(([displayName, sourceName]) => {
+      const items = liveDimension(rows, target.dataset, sourceName);
+      if (items.length) target.dimensions[displayName] = items;
+    });
+  });
+
+  const lep = next.products.find((item) => item.id === "lep");
+  const unity = next.products.find((item) => item.id === "unity");
+  if (lep) lep.insight = `${number.format(lep.count)} delivered LEP resources are included in the live executive reporting layer.`;
+  if (unity) unity.insight = `${number.format(unity.count)} unique GitHub-available simulations are included in the live executive reporting layer.`;
 
   const datedRow = rows.find((row) => row.Dataset === "Portfolio" && row.Dimension === "KPI" && row.Label === "Total") || rows[0];
   next.updatedOn = formatDate(datedRow?.Updated_On || payload.lastSynced);
