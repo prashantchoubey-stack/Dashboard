@@ -77,8 +77,13 @@ const approvedSnapshot = {
       id: "weekly", dataset: "WP/WA", name: "WP / WA Assessment", short: "WP/WA", count: 17657,
       status: "Approved question count", owner: "Assessment Operations",
       basis: "WP and WA use one combined assessment-bank count. Each consolidated row represents one question.",
-      insight: "17,657 approved questions are included in the executive portfolio.",
-      dimensions: { KPI: [{ label: "Approved questions", value: 17657 }] },
+      insight: "17,657 approved questions: 74% Maths, 63% English-language and 76% tagged to HP.",
+      dimensions: {
+        Subject: [{ label: "Maths", value: 13130 }, { label: "Science", value: 2196 }, { label: "English", value: 840 }, { label: "Hindi", value: 816 }, { label: "EVS", value: 672 }, { label: "Unknown", value: 3 }],
+        Language: [{ label: "English", value: 11118 }, { label: "Hindi", value: 6539 }],
+        State: [{ label: "HP", value: 13409 }, { label: "Unknown", value: 4248 }],
+        Grade: [{ label: "Grade 1", value: 1411 }, { label: "Grade 2", value: 1365 }, { label: "Grade 3", value: 1591 }, { label: "Grade 4", value: 1548 }, { label: "Grade 5", value: 1553 }, { label: "Grade 6", value: 2352 }, { label: "Grade 7", value: 2424 }, { label: "Grade 8", value: 2339 }, { label: "Grade 9", value: 1419 }, { label: "Grade 10", value: 1651 }, { label: "Unknown", value: 4 }],
+      },
     },
     {
       id: "unity", dataset: "Unity", name: "Unity Simulations", short: "Unity", count: 84,
@@ -195,6 +200,7 @@ function applyApprovedRows(payload) {
 
   const liveDimensionSets = {
     lep: { Subject: "Subject", "Resource type": "Content Type", Grade: "Grade" },
+    weekly: { Subject: "Subject", Language: "Medium", State: "State", Grade: "Grade" },
     unity: { Grade: "Grade", Language: "Medium" },
   };
   Object.entries(liveDimensionSets).forEach(([id, dimensions]) => {
@@ -206,8 +212,10 @@ function applyApprovedRows(payload) {
   });
 
   const lep = next.products.find((item) => item.id === "lep");
+  const weekly = next.products.find((item) => item.id === "weekly");
   const unity = next.products.find((item) => item.id === "unity");
   if (lep) lep.insight = `${number.format(lep.count)} delivered LEP resources are included in the live executive reporting layer.`;
+  if (weekly) weekly.insight = `${number.format(weekly.count)} approved questions are included in the combined WP / WA assessment bank.`;
   if (unity) unity.insight = `${number.format(unity.count)} unique GitHub-available simulations are included in the live executive reporting layer.`;
 
   const datedRow = rows.find((row) => row.Dataset === "Portfolio" && row.Dimension === "KPI" && row.Label === "Total") || rows[0];
