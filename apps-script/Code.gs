@@ -3,7 +3,7 @@ const PUBLIC_SHEET_NAME = "GitHub_Live_Data";
 const PUBLIC_FIELDS = ["Dataset", "Dimension", "Label", "Value", "Status", "Updated_On", "Note"];
 const PUBLIC_OUTPUT_FIELDS = ["Dataset", "Dimension", "Label", "Value", "Status", "Updated_On"];
 const ALLOWED_DATASETS = new Set(["Portfolio", "PAL", "LEP", "WP/WA", "Unity", "POD B"]);
-const ALLOWED_DIMENSIONS = new Set(["KPI", "Content Type", "Grade", "Subject", "Medium", "Provider/Project", "Validation"]);
+const ALLOWED_DIMENSIONS = new Set(["KPI", "Content Type", "Grade", "Subject", "Medium", "State", "Provider/Project", "Validation"]);
 
 function doGet() {
   try {
