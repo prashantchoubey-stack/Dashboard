@@ -2,6 +2,7 @@ const palette = ["#5b5ce2", "#13a8a8", "#f59e0b", "#e95d78", "#7c3aed", "#3b82f6
 const number = new Intl.NumberFormat("en-IN");
 const LIVE_CACHE_KEY = "cocc-approved-live-data-v1";
 const LIVE_REQUEST_TIMEOUT_MS = 12000;
+const PUBLIC_ROW_FIELDS = Object.freeze(["Dataset", "Dimension", "Label", "Value", "Status", "Updated_On"]);
 
 const approvedSnapshot = {
   portfolioTotal: 63787,
@@ -108,9 +109,14 @@ const approvedSnapshot = {
 const state = {
   data: structuredClone(approvedSnapshot),
   source: "checking",
+  activeView: "portfolio",
   selectedProduct: "pal",
   selectedDimension: "Content type",
   error: "",
+  lastSuccessfulSync: "",
+  hasCachedData: false,
+  publicDataSafety: "pending",
+  publicDataMessage: "",
 };
 
 function readLastValidData() {
@@ -118,6 +124,12 @@ function readLastValidData() {
     const cached = JSON.parse(window.localStorage.getItem(LIVE_CACHE_KEY) || "null");
     if (!cached || typeof cached !== "object" || !cached.data) return null;
     if (!Number.isFinite(Number(cached.data.portfolioTotal)) || !Array.isArray(cached.data.products)) return null;
+    state.hasCachedData = true;
+    if (cached.savedAt) state.lastSuccessfulSync = formatDateTime(cached.savedAt);
+    if (cached.schemaValidated === true) {
+      state.publicDataSafety = "passed";
+      state.publicDataMessage = "The cached live response previously passed the six-field public schema check.";
+    }
     return cached.data;
   } catch {
     return null;
@@ -126,7 +138,8 @@ function readLastValidData() {
 
 function storeLastValidData(data) {
   try {
-    window.localStorage.setItem(LIVE_CACHE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), data }));
+    window.localStorage.setItem(LIVE_CACHE_KEY, JSON.stringify({ savedAt: new Date().toISOString(), schemaValidated: state.publicDataSafety === "passed", data }));
+    state.hasCachedData = true;
   } catch {
     // Storage can be unavailable in private browsing; the in-memory data remains valid.
   }
@@ -223,6 +236,157 @@ function applyApprovedRows(payload) {
   return next;
 }
 
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value || "");
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "numeric", month: "short", year: "numeric",
+    hour: "2-digit", minute: "2-digit", hour12: true,
+  }).format(date);
+}
+
+function auditPublicPayload(payload) {
+  const allowedTopFields = new Set(["success", "lastSynced", "data"]);
+  const unexpectedTopFields = Object.keys(payload || {}).filter((key) => !allowedTopFields.has(key));
+  if (!payload || payload.success !== true || !Array.isArray(payload.data)) {
+    return { ok: false, message: "The endpoint response is not a valid approved-data payload." };
+  }
+  const required = new Set(PUBLIC_ROW_FIELDS);
+  const unexpectedRowFields = new Set();
+  const missingRowFields = new Set();
+  payload.data.forEach((row) => {
+    Object.keys(row || {}).forEach((key) => {
+      if (!required.has(key)) unexpectedRowFields.add(key);
+    });
+    PUBLIC_ROW_FIELDS.forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(row || {}, key)) missingRowFields.add(key);
+    });
+  });
+  if (unexpectedTopFields.length || unexpectedRowFields.size || missingRowFields.size) {
+    return { ok: false, message: "The public endpoint schema differs from the six-field approved contract." };
+  }
+  return { ok: true, message: "Verified: every public data row is limited to the six approved executive fields." };
+}
+
+function dimensionTotal(product, dimensionName) {
+  return total(product?.dimensions?.[dimensionName] || []);
+}
+
+function dimensionLabelValue(product, dimensionName, label) {
+  return Number(product?.dimensions?.[dimensionName]?.find((item) => item.label === label)?.value || 0);
+}
+
+function validationBadge(tone, label) {
+  return `<span class="validationBadge ${tone}">${escapeHtml(label)}</span>`;
+}
+
+function bindShellEvents(root) {
+  root.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => {
+    state.activeView = button.dataset.view;
+    render();
+  }));
+  document.getElementById("refresh-live")?.addEventListener("click", refresh);
+}
+
+function renderValidation() {
+  const root = document.getElementById("root");
+  const products = state.data.products;
+  const byId = Object.fromEntries(products.map((product) => [product.id, product]));
+  const productSum = products.reduce((sum, product) => sum + product.count, 0);
+  const checks = [
+    { name: "Portfolio reconciliation", detail: "PAL + LEP + WP/WA + Unity + POD B", observed: productSum, expected: state.data.portfolioTotal },
+    { name: "LEP subjects", detail: "Additive subject breakdown", observed: dimensionTotal(byId.lep, "Subject"), expected: byId.lep.count },
+    { name: "LEP resource types", detail: "Additive resource-type breakdown", observed: dimensionTotal(byId.lep, "Resource type"), expected: byId.lep.count },
+    { name: "LEP grades", detail: "Additive grade breakdown", observed: dimensionTotal(byId.lep, "Grade"), expected: byId.lep.count },
+    { name: "WP/WA subjects", detail: "Includes Unknown subject", observed: dimensionTotal(byId.weekly, "Subject"), expected: byId.weekly.count },
+    { name: "WP/WA languages", detail: "Additive language breakdown", observed: dimensionTotal(byId.weekly, "Language"), expected: byId.weekly.count },
+    { name: "WP/WA states", detail: "Includes Unknown state", observed: dimensionTotal(byId.weekly, "State"), expected: byId.weekly.count },
+    { name: "WP/WA grades", detail: "Includes Unknown grade", observed: dimensionTotal(byId.weekly, "Grade"), expected: byId.weekly.count },
+    { name: "Unity grades", detail: "Unique approved simulations", observed: dimensionTotal(byId.unity, "Grade"), expected: byId.unity.count },
+  ].map((check) => ({ ...check, passed: check.observed === check.expected }));
+  const failedChecks = checks.filter((check) => !check.passed).length;
+  const passedChecks = checks.length - failedChecks;
+  const sourceLabel = state.source === "live" ? "Live endpoint" : state.source === "cached" ? "Last valid live data" : state.source === "checking" ? "Checking endpoint" : "Approved snapshot";
+  const refreshLabel = state.source === "checking" ? "● Refreshing live data" : state.source === "live" ? "● Live data synced" : state.source === "cached" ? "● Last valid data" : "● Approved fallback";
+  const apiTone = state.source === "live" ? "passed" : state.source === "checking" ? "pending" : "failed";
+  const apiLabel = state.source === "live" ? "Available" : state.source === "checking" ? "Checking" : "Unavailable";
+  const modeTone = state.source === "live" ? "passed" : state.source === "checking" ? "pending" : "warning";
+  const modeLabel = state.source === "live" ? "Live" : state.source === "cached" ? "Cached fallback" : state.source === "snapshot" ? "Snapshot fallback" : "Checking";
+  const safetyTone = state.publicDataSafety === "passed" ? "passed" : state.publicDataSafety === "failed" ? "failed" : "pending";
+  const safetyLabel = state.publicDataSafety === "passed" ? "Verified" : state.publicDataSafety === "failed" ? "Failed" : "Awaiting live response";
+  const approvalRows = [
+    { product: "PAL", status: "Approved", tone: "passed", rule: byId.pal.basis },
+    { product: "LEP", status: "Approved", tone: "passed", rule: byId.lep.basis },
+    { product: "WP / WA Assessment", status: "Warning", tone: "warning", rule: byId.weekly.basis },
+    { product: "Unity Simulations", status: "Warning", tone: "warning", rule: byId.unity.basis },
+    { product: "POD B", status: "Pending", tone: "pending", rule: "Count only final LBDs confirmed by the POC; Canva, Figma, games, instructions and VO tabs are not separate products." },
+  ];
+  const warnings = [
+    { label: "WP/WA unknown subject", value: dimensionLabelValue(byId.weekly, "Subject", "Unknown"), note: "3 source rows need subject confirmation.", tone: "warning" },
+    { label: "WP/WA unknown grade", value: dimensionLabelValue(byId.weekly, "Grade", "Unknown"), note: "4 source rows need grade confirmation.", tone: "warning" },
+    { label: "WP/WA unknown state", value: dimensionLabelValue(byId.weekly, "State", "Unknown"), note: "Do not assign to HP until Karishma confirms all sources.", tone: "warning" },
+    { label: "Unity unspecified language", value: dimensionLabelValue(byId.unity, "Language", "Unspecified"), note: "Retained within the approved total of 84.", tone: "warning" },
+    { label: "POD B final LBD count", value: "Pending", note: "Current approved KPI remains 0 until Snigdha confirms final LBDs.", tone: "pending" },
+  ];
+  root.innerHTML = `
+    <main class="shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brandMark">C</span><span>Content Intelligence</span></div>
+        <nav>
+          <button class="navItem" data-view="portfolio">◫ <span>Portfolio</span></button>
+          <button class="navItem" disabled title="Count Explorer is planned">⌁ <span>Count explorer</span></button>
+          <button class="navItem active" data-view="validation">✓ <span>Validation</span></button>
+          <button class="navItem" disabled title="Delivery is planned">↗ <span>Delivery</span></button>
+        </nav>
+        <div class="sideStatus"><span class="pulse"></span><div><strong>Controlled view</strong><small>${sourceLabel} · ${escapeHtml(state.data.updatedOn)}</small></div></div>
+      </aside>
+      <section class="workspace validationWorkspace">
+        <header class="topbar">
+          <div><p class="eyebrow">CONTENT REPOSITORY</p><h1>Validation & Controls</h1><p>Reconciliation, approval status, system health and public-data safety</p></div>
+          <button id="refresh-live" class="auditTag" style="cursor:pointer" ${state.source === "checking" ? "disabled" : ""}>${refreshLabel}</button>
+        </header>
+        <section class="validationHero ${failedChecks ? "hasFailure" : ""}">
+          <div><p class="eyebrow">PORTFOLIO RECONCILIATION</p><h2>${failedChecks ? "Validation needs attention" : "Approved totals reconcile"}</h2><p class="equation">${products.map((product) => `${escapeHtml(product.short)} ${number.format(product.count)}`).join(" + ")} = <strong>${number.format(productSum)}</strong></p></div>
+          <div class="validationScore">${validationBadge(failedChecks ? "failed" : "passed", failedChecks ? "Failed" : "Passed")}<strong>${passedChecks}/${checks.length}</strong><span>reconciliation checks passed</span></div>
+        </section>
+        <section class="validationGrid">
+          <article class="panel validationPanel reconciliationPanel">
+            <div class="panelHead"><div><p class="eyebrow">ADDITIVE CHECKS</p><h3>Breakdown reconciliation</h3></div><span>Unity language is coverage, not additive</span></div>
+            <div class="validationRows">${checks.map((check) => `<div class="validationRow"><div><strong>${escapeHtml(check.name)}</strong><span>${escapeHtml(check.detail)}</span></div><div><span>Observed</span><strong>${number.format(check.observed)}</strong></div><div><span>Expected</span><strong>${number.format(check.expected)}</strong></div>${validationBadge(check.passed ? "passed" : "failed", check.passed ? "Passed" : "Failed")}</div>`).join("")}</div>
+            <p class="validationNote">Unity language values overlap because one simulation can be available in more than one language. They are intentionally excluded from additive KPI reconciliation.</p>
+          </article>
+          <article class="panel validationPanel">
+            <div class="panelHead"><div><p class="eyebrow">MISSING DATA</p><h3>Warnings requiring confirmation</h3></div></div>
+            <div class="warningList">${warnings.map((warning) => `<div class="warningCard ${warning.tone}"><div><span>${escapeHtml(warning.label)}</span><strong>${typeof warning.value === "number" ? number.format(warning.value) : escapeHtml(warning.value)}</strong></div>${validationBadge(warning.tone, warning.tone === "pending" ? "Pending" : "Warning")}<p>${escapeHtml(warning.note)}</p></div>`).join("")}</div>
+          </article>
+        </section>
+        <section class="panel validationPanel approvalPanel">
+          <div class="panelHead"><div><p class="eyebrow">APPROVAL STATUS</p><h3>Approved baseline and counting rules</h3></div><span>Updated ${escapeHtml(state.data.updatedOn)}</span></div>
+          <div class="approvalTable"><table><thead><tr><th>Product</th><th>Status</th><th>Updated</th><th>Counting rule</th></tr></thead><tbody>${approvalRows.map((row) => `<tr><td>${escapeHtml(row.product)}</td><td>${validationBadge(row.tone, row.status)}</td><td>${escapeHtml(state.data.updatedOn)}</td><td>${escapeHtml(row.rule)}</td></tr>`).join("")}</tbody></table></div>
+        </section>
+        <section class="validationGrid lowerGrid">
+          <article class="panel validationPanel">
+            <div class="panelHead"><div><p class="eyebrow">SYSTEM HEALTH</p><h3>Live dashboard services</h3></div></div>
+            <div class="healthGrid">
+              <div><span>Apps Script API</span>${validationBadge(apiTone, apiLabel)}<p>${state.error ? escapeHtml(state.error) : "Approved JSON endpoint response."}</p></div>
+              <div><span>Last successful sync</span>${validationBadge(state.lastSuccessfulSync ? "passed" : "pending", state.lastSuccessfulSync ? "Recorded" : "Pending")}<p>${escapeHtml(state.lastSuccessfulSync || "No successful sync recorded in this browser yet.")}</p></div>
+              <div><span>Data mode</span>${validationBadge(modeTone, modeLabel)}<p>${escapeHtml(sourceLabel)} is currently powering the dashboard.</p></div>
+              <div><span>Last-valid cache</span>${validationBadge(state.hasCachedData ? "passed" : "pending", state.hasCachedData ? "Ready" : "Not stored")}<p>${state.hasCachedData ? "A validated live response is available for fallback." : "Cache will be created after a successful live sync."}</p></div>
+              <div><span>GitHub dashboard</span>${validationBadge("passed", "Available")}<p>The current GitHub Pages dashboard loaded successfully.</p></div>
+            </div>
+          </article>
+          <article class="panel validationPanel safetyPanel">
+            <div class="panelHead"><div><p class="eyebrow">PUBLIC-DATA SAFETY</p><h3>Approved API contract</h3></div>${validationBadge(safetyTone, safetyLabel)}</div>
+            <p class="safetyMessage">${escapeHtml(state.publicDataMessage || "The schema will be checked when the live endpoint responds.")}</p>
+            <div class="safetyFields">${PUBLIC_ROW_FIELDS.map((field) => `<code>${escapeHtml(field)}</code>`).join("")}</div>
+            <div class="safetyBlock"><strong>Never exposed</strong><p>Internal paths, source worksheet names, raw records, file-level data and private tabs.</p></div>
+          </article>
+        </section>
+      </section>
+    </main>`;
+  bindShellEvents(root);
+}
+
 function donutStyle(items) {
   const represented = total(items);
   if (!represented) return "#e8edf4";
@@ -236,6 +400,10 @@ function donutStyle(items) {
 }
 
 function render() {
+  if (state.activeView === "validation") {
+    renderValidation();
+    return;
+  }
   const root = document.getElementById("root");
   const products = state.data.products;
   const product = products.find((item) => item.id === state.selectedProduct) || products[0];
@@ -258,10 +426,10 @@ function render() {
       <aside class="sidebar">
         <div class="brand"><span class="brandMark">C</span><span>Content Intelligence</span></div>
         <nav>
-          <button class="navItem active">◫ <span>Portfolio</span></button>
-          <button class="navItem">⌁ <span>Count explorer</span></button>
-          <button class="navItem">✓ <span>Validation</span></button>
-          <button class="navItem">↗ <span>Delivery</span></button>
+          <button class="navItem active" data-view="portfolio">◫ <span>Portfolio</span></button>
+          <button class="navItem" disabled title="Count Explorer is planned">⌁ <span>Count explorer</span></button>
+          <button class="navItem" data-view="validation">✓ <span>Validation</span></button>
+          <button class="navItem" disabled title="Delivery is planned">↗ <span>Delivery</span></button>
         </nav>
         <div class="sideStatus"><span class="pulse"></span><div><strong>Controlled view</strong><small>${sourceLabel} · ${escapeHtml(state.data.updatedOn)}</small></div></div>
       </aside>
@@ -313,7 +481,7 @@ function render() {
     state.selectedDimension = button.dataset.dimension;
     render();
   }));
-  document.getElementById("refresh-live")?.addEventListener("click", refresh);
+  bindShellEvents(root);
 }
 
 async function refresh() {
@@ -335,8 +503,14 @@ async function refresh() {
   try {
     const response = await fetch(endpoint, { cache: "no-store", signal: controller.signal });
     if (!response.ok) throw new Error(`Live-data HTTP ${response.status}`);
-    const nextData = applyApprovedRows(await response.json());
+    const payload = await response.json();
+    const safetyAudit = auditPublicPayload(payload);
+    state.publicDataSafety = safetyAudit.ok ? "passed" : "failed";
+    state.publicDataMessage = safetyAudit.message;
+    if (!safetyAudit.ok) throw new Error("Public API schema validation failed");
+    const nextData = applyApprovedRows(payload);
     state.data = nextData;
+    state.lastSuccessfulSync = formatDateTime(payload.lastSynced || new Date().toISOString());
     storeLastValidData(nextData);
     state.source = "live";
   } catch (error) {
